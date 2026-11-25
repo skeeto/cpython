@@ -178,7 +178,11 @@ def _readmodule(module, path, inpackage=None):
         if source is None:
             return tree
 
-    fname = spec.loader.get_filename(fullmodule)
+    try:
+        fname = spec.loader.get_filename(fullmodule)
+    except AttributeError:
+        # A frozen module with source (an embedded stdlib).
+        fname = getattr(spec.loader_state, 'filename', None) or spec.origin
     return _create_tree(fullmodule, path, fname, source, tree, inpackage)
 
 

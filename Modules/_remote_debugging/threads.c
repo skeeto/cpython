@@ -845,6 +845,55 @@ _Py_RemoteDebug_ResumeAllThreads(RemoteUnwinderObject *unwinder, _Py_RemoteDebug
 
 #elif defined(MS_WINDOWS)
 
+#ifdef _Py_TARGET_XP
+// Windows XP has no NtGetNextThread (Vista).  The target is suspended, so
+// a Toolhelp snapshot of its threads is complete; wait for each to stop.
+static int
+wait_for_threads_to_stop_toolhelp(RemoteUnwinderObject *unwinder)
+{
+    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+    if (snapshot == INVALID_HANDLE_VALUE) {
+        PyErr_SetFromWindowsErr(GetLastError());
+        return -1;
+    }
+    int result = 0;
+    THREADENTRY32 entry = {.dwSize = sizeof(entry)};
+    for (BOOL ok = Thread32First(snapshot, &entry); ok && result == 0;
+         ok = Thread32Next(snapshot, &entry)) {
+        if (entry.th32OwnerProcessID != (DWORD)unwinder->handle.pid) {
+            continue;
+        }
+        HANDLE thread = OpenThread(THREAD_GET_CONTEXT | SYNCHRONIZE, FALSE,
+                                   entry.th32ThreadID);
+        if (thread == NULL) {
+            if (GetLastError() == ERROR_INVALID_PARAMETER) {
+                continue;  // exited since the snapshot
+            }
+            PyErr_SetFromWindowsErr(GetLastError());
+            result = -1;
+            break;
+        }
+        // As below: reading the context waits for the thread to stop.
+        CONTEXT context = {.ContextFlags = CONTEXT_CONTROL};
+        if (!GetThreadContext(thread, &context)) {
+            DWORD error = GetLastError();
+            if (WaitForSingleObject(thread, 0) != WAIT_OBJECT_0) {
+                PyErr_SetFromWindowsErr(error);
+                result = -1;
+            }
+        }
+        CloseHandle(thread);
+    }
+    CloseHandle(snapshot);
+    if (result == 0 && !is_process_alive(unwinder->handle.hProcess)) {
+        PyErr_Format(PyExc_ProcessLookupError,
+                     "Process %d has terminated", unwinder->handle.pid);
+        result = -1;
+    }
+    return result;
+}
+#endif
+
 static int
 wait_for_threads_to_stop(RemoteUnwinderObject *unwinder)
 {
@@ -862,8 +911,12 @@ wait_for_threads_to_stop(RemoteUnwinderObject *unwinder)
         tried_load = 1;
     }
     if (pNtGetNextThread == NULL) {
+#ifdef _Py_TARGET_XP
+        return wait_for_threads_to_stop_toolhelp(unwinder);
+#else
         PyErr_SetString(PyExc_RuntimeError, "NtGetNextThread not available");
         return -1;
+#endif
     }
 
     HANDLE previous = NULL;

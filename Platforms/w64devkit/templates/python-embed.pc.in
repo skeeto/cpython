@@ -1,0 +1,10 @@
+# Embed Python through python.dll.
+prefix=${pcfiledir}/../..
+includedir=${prefix}/include
+libdir=${prefix}/lib
+
+Name: Python
+Description: Embed Python into an application (python.dll, @PY_PLATFORM_TAG@)
+Version: @PY_SHORT@
+Cflags: -I${includedir}/@PY_INCLUDE_SUBDIR@
+Libs: -L${libdir} -l:@PY_IMPORT_LIB_NAME@

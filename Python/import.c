@@ -5653,6 +5653,14 @@ imp_module_exec(PyObject *module)
         return -1;
     }
 
+#if defined(Py_STDLIB_FROZEN) && Py_STDLIB_FROZEN
+    /* The whole stdlib is frozen: FrozenImporter.exec_module gives its code
+       the real source path (see Lib/importlib/_bootstrap.py). */
+    if (PyModule_Add(module, "_stdlib_frozen", Py_NewRef(Py_True)) < 0) {
+        return -1;
+    }
+#endif
+
     return 0;
 }
 

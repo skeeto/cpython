@@ -25,7 +25,16 @@ extern "C" {
 
 // Please note that section names are truncated to eight bytes
 // on Windows!
-#if defined(MS_WINDOWS)
+#if defined(MS_WINDOWS) && defined(__GNUC__)
+// GCC ignores the MSVC pragma and allocate.  GNU ld keeps a long section
+// name in the COFF string table, which readers of the image's section
+// headers (Python/remote_debug.h) do not see, so give the eight-byte names
+// that MSVC truncates to.
+#define _Py_DEBUG_SECTION_PE_PyRuntime    "PyRuntim"
+#define _Py_DEBUG_SECTION_PE_AsyncioDebug "AsyncioD"
+#define _GENERATE_DEBUG_SECTION_WINDOWS(name) \
+   __attribute__((section(_Py_DEBUG_SECTION_PE_##name), used))
+#elif defined(MS_WINDOWS)
 #define _GENERATE_DEBUG_SECTION_WINDOWS(name)                       \
    _Pragma(Py_STRINGIFY(section(Py_STRINGIFY(name), read, write))) \
    __declspec(allocate(Py_STRINGIFY(name)))

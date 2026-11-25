@@ -71,6 +71,13 @@ raised for division by zero and mod by zero.
 #include "_math.h"
 #include <stdbool.h>
 
+#if defined(__MINGW32__) && defined(__i386__)
+/* mingw-w64's i686 fpclassify() uses the x87 FXAM instruction, which sees a
+   double subnormal as normal once it is loaded into an x87 register. */
+#  undef isnormal
+#  define isnormal(x) __builtin_isnormal(x)
+#endif
+
 #include "clinic/mathmodule.c.h"
 
 /*[clinic input]

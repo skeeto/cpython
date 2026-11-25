@@ -13,7 +13,8 @@ SOURCE = {
     'C++': 'extension.cpp',
 }
 
-MSVC = support.MS_WINDOWS
+# A mingw Python builds extensions with GCC (setuptools' mingw32 compiler).
+MSVC = support.MS_WINDOWS and not sysconfig.get_platform().startswith('mingw')
 
 
 ### C flags #################################################################
@@ -162,7 +163,7 @@ def main():
     # CC command.
     cmd = (sysconfig.get_config_var('CC') or '')
     if cmd is not None and 'CC' not in os.environ:
-        if support.MS_WINDOWS:
+        if MSVC:
             std_prefix = '/std'
         else:
             std_prefix = '-std'

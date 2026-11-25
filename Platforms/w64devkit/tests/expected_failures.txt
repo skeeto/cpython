@@ -1,0 +1,83 @@
+# Known regrtest failures of the w64devkit build, for --ignorefile:
+#
+#   build/run/<flavor>/python.exe -m test -j0 -u all,-gui,-network \
+#       --ignorefile Platforms/w64devkit/tests/expected_failures.txt
+#
+# One test id per line.  regrtest has no comment syntax, but a line
+# starting with '#' never matches a test id.  Identical on x64 and x86.
+# Tags: [static] or [shared] when only that flavor fails; the other skips
+# or passes the test.  Measured on 3.15.2+dev.
+
+# ---- The stdlib is frozen ------------------------------------------------
+# FrozenImporter precedes PathFinder, so a frozen module cannot be shadowed
+# by a file of the same name in the script directory or the working
+# directory.
+test.test_cmd_line.CmdLineTest.test_isolatedmode
+test.test_cmd_line_script.CmdLineTest.test_hint_when_triying_to_import_a_py_file
+# [shared] (static skips test_import: no _testmultiphase built in)
+test.test_import.ImportTests.test_package_shadowing_stdlib_module
+test.test_import.ImportTests.test_script_shadowing_stdlib
+test.test_import.ImportTests.test_script_shadowing_stdlib_edge_cases
+test.test_import.ImportTests.test_script_shadowing_stdlib_sys_path_modification
+# repr() of a frozen module is "<module 'unittest' (frozen)>".
+test.test_fstring.TestCase.test_global
+test.test_module.ModuleTests.test_module_repr_source
+# The test assumes threading is loaded from source.  [shared]
+test.test_import.SubinterpImportTests.test_isolated_config
+test.test_import.SubinterpImportTests.test_python_compat
+# The test assumes the importlib package is not frozen.  [shared]
+test.test_importlib.frozen.test_loader.Frozen_InspectLoaderTests.test_failure
+test.test_importlib.frozen.test_loader.Source_InspectLoaderTests.test_failure
+# types.__loader__ is the FrozenImporter class, which pickles by reference.
+test.test_crossinterp.PickleTests.test_not_shareable
+test.test_crossinterp.ShareableFallbackTests.test_not_shareable
+# importfile() loads pydoc.py from source; its spec differs from the
+# frozen pydoc's.
+test.test_pydoc.test_pydoc.PydocImportTest.test_importfile
+# Submodule completion compares the file finder's spec with the frozen one.
+test.test_pyrepl.test_pyrepl.TestPyReplModuleCompleter.test_colorize_import_completions
+test.test_pyrepl.test_pyrepl.TestPyReplModuleCompleter.test_completions
+test.test_pyrepl.test_pyrepl.TestPyReplModuleCompleter.test_relative_completions
+
+# ---- Modules built into the image --------------------------------------
+# _sqlite3 is built in, with SQLite linked statically: no __file__, no
+# sqlite3.dll.  [shared]
+test.test_ctypes.test_loading.LoaderTest.test_load_dll_with_flags
+test.test_import.ImportTests.test_dll_dependency_import
+# _testcapi is built into the static test interpreter, so its spec has no
+# file to load _testcapi_datetime from.  [static]
+test.datetimetester.CapiTest_Fast.test_type_check_in_subinterp
+
+# ---- PCbuild -----------------------------------------------------------------
+# Run PCbuild's scripts and binaries.
+test.test_regrtest.ProgramsTestCase.test_pcbuild_rt
+test.test_regrtest.ProgramsTestCase.test_tools_buildbot_test
+
+# ---- Not the stock build ---------------------------------------------------
+# The DLL is python.dll, not python315.dll.
+test.test_sysconfig.TestSysConfig.test_library
+# The platform tag is mingw_x86_64_msvcrt_gnu, not win_amd64.  [shared]
+test.test_importlib.test_windows.Frozen_WindowsExtensionSuffixTests.test_tagged_suffix
+test.test_importlib.test_windows.Source_WindowsExtensionSuffixTests.test_tagged_suffix
+# In a venv the static flavor has no DLL directory for the pythonXY.zip
+# entry of sys.path, so it is the executable's directory.  [static]
+test.test_embed.InitConfigTests.test_init_pyvenv_cfg
+
+# ---- msvcrt.dll ------------------------------------------------------------
+# setlocale() rejects "Language.codepage" names without a country.
+test.test_locale.TestRealLocales.test_setlocale_long_encoding
+# mingw-w64's C99 printf formats %p in lower case; the test expects the
+# MS CRT's upper case.
+test.test_bytes.BytesTest.test_from_format
+
+# ---- Environment -------------------------------------------------------------
+# Fails whenever stdin is the NUL device (os.isatty() is true for NUL, but
+# it has no console code page), as in CI or a detached shell.
+test.test_os.test_os.DeviceEncodingTests.test_device_encoding
+# Fails unless long paths are enabled (LongPathsEnabled): with the longer
+# platform tag, a path in pip's wheel cache exceeds MAX_PATH.  [shared]
+test.test_cext.TestPublicCpp.test_build_cpp03_no_typeof
+# x86, rarely: the test computes stack pointer - 7654321, which wraps around
+# when ASLR puts the stack below 7.6 MB, and an assert() aborts the worker.
+# An upstream test bug on any 32-bit Windows.  [shared]
+test.test_capi.test_misc.Test_testinternalcapi.test_threadstate_set_stack_protection

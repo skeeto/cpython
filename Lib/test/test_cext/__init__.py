@@ -18,6 +18,9 @@ from test.support import os_helper
 
 if not support.has_subprocess_support:
     raise unittest.SkipTest("requires subprocess support")
+import importlib.machinery
+if not importlib.machinery.EXTENSION_SUFFIXES:
+    raise unittest.SkipTest("cannot load extension modules")
 
 
 SOURCE_DIR = os.path.dirname(__file__)
@@ -27,7 +30,8 @@ SOURCES = [
     os.path.join(SOURCE_DIR, 'setup.py'),
 ]
 RUNTESTS_PY = os.path.join(SOURCE_DIR, 'runtests.py')
-MSVC = support.MS_WINDOWS
+# A mingw Python builds extensions with GCC (setuptools' mingw32 compiler).
+MSVC = support.MS_WINDOWS and not sysconfig.get_platform().startswith('mingw')
 
 
 # With MSVC on a debug build, the linker fails with: cannot open file

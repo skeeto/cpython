@@ -1,0 +1,125 @@
+# Known regrtest failures of the PY_TARGET_XP build, on top of
+# ../expected_failures.txt.  Run with both files, and exclude the modules
+# the XP build lacks:
+#
+#   python.exe -m test -j2 -u all,-gui,-network -x test_wmi test_venv \
+#       --ignorefile Platforms/w64devkit/tests/expected_failures.txt \
+#       --ignorefile Platforms/w64devkit/tests/xp/expected_failures.txt
+#
+# test_wmi: no _wmi (it needs Vista's WMI and propsys).
+# test_venv: no venv launchers (PathCch, Windows 8).
+#
+# The same on current Windows with PY_XPCOMPAT_FORCE=1, which also forces:
+# - os.stat() of a path gets the 64-bit volume serial number through
+#   Windows 11's GetFileInformationByName, os.fstat() the 32-bit one through
+#   the fallbacks: their st_dev differ.  (On XP both are 32-bit.)
+
+# sysconfig makes a venv.
+test.test_sysconfig.TestSysConfig.test_makefile_overwrites_config_vars
+
+# os.mkdir(path, 0o700): the owner-rights SID (OW) is the current user's.
+test.test_os.test_os.MakedirTests.test_win32_mkdir_700
+
+# subprocess's handle_list: XP has no attribute lists, so the child
+# inherits every inheritable handle.
+test.test_subprocess.Win32ProcessTestCase.test_close_fds_with_stdio
+
+# socket.if_nameindex() and friends: no interface table before Vista.
+test.test_socket.GeneralModuleTests.testInterfaceNameIndex
+test.test_socket.GeneralModuleTests.testInvalidInterfaceIndexToName
+
+# ---- Only on XP itself (these pass with PY_XPCOMPAT_FORCE=1) ----------------
+
+# XP limitations.
+
+# SIO_LOOPBACK_FAST_PATH and SIO_TCP_SET_ACK_FREQUENCY (TCP_QUICKACK) are
+# Windows 8 ioctls: WSAEINVAL.
+test.test_socket.GeneralModuleTests.test_sio_loopback_fast_path
+test.test_socket.TestQuickackFlag.test_set_quickack
+
+# getaddrinfo() ignores AI_NUMERICSERV (Vista) and resolves "http".
+test.test_socket.GeneralModuleTests.testGetaddrinfo
+test.test_socket.GeneralModuleTests.test_getaddrinfo_localized_error
+
+# Pipe mode 8, PIPE_REJECT_REMOTE_CLIENTS (Vista): WinError 87.  The stdlib
+# never passes it, only these tests; dropping it in xpcompat would silently
+# drop a restriction the caller asked for.
+test.test_audit.AuditTest.test_winapi_createnamedpipe
+test.test_winapi.WinAPITests.test_namedpipe
+
+# Reading HKEY_PERFORMANCE_DATA loads some 50 counter-provider DLLs into
+# the process, which on XP share its msvcrt.dll, and one of them sets its
+# locale (to .437): regrtest reports the environment changed.
+test.test_winreg.LocalWinregTests.test_dynamic_key
+
+# os.stat(r"\\.\CON"): XP opens the console only for reading or writing.
+test.test_ntpath.TestNtpath.test_con_device
+
+# XP's ShellLink object answers QueryInterface for IPersistFile and
+# IPersistStream but not their base IPersist: CoCreateInstance(
+# CLSID_ShellLink, IID_IPersist) fails with E_NOINTERFACE.
+test.test_ctypes.test_win32_com_foreign_func.CopyComPointerTests.test_both_are_nonnull
+test.test_ctypes.test_win32_com_foreign_func.CopyComPointerTests.test_src_is_nonnull_and_dest_is_null
+test.test_ctypes.test_win32_com_foreign_func.CopyComPointerTests.test_src_is_null_and_dest_is_nonnull
+test.test_ctypes.test_win32_com_foreign_func.ForeignFunctionsThatWillCallComMethodsTests.test_with_paramflags_and_iid
+test.test_ctypes.test_win32_com_foreign_func.ForeignFunctionsThatWillCallComMethodsTests.test_with_paramflags_and_without_iid
+test.test_ctypes.test_win32_com_foreign_func.ForeignFunctionsThatWillCallComMethodsTests.test_without_paramflags_and_iid
+
+# _remote_debugging's on-CPU thread status needs OpenThread(
+# THREAD_QUERY_LIMITED_INFORMATION) (Vista) and NtQueryInformationThread's
+# ThreadSystemThreadInformation (Windows 8): every thread's status is
+# unknown, so the tests time out waiting for one on the CPU, and CPU mode
+# (--mode=cpu) skips every thread and collects no samples.
+test.test_external_inspection.TestDetectionOfThreadStatus.test_thread_status_detection
+test.test_external_inspection.TestDetectionOfThreadStatus.test_thread_status_all_mode_detection
+test.test_profiling.test_sampling_profiler.test_modes.TestCpuModeFiltering.test_cpu_mode_integration_filtering
+
+# Test assumptions about newer Windows.
+
+# icacls.exe is new in Vista (XP has cacls.exe): the tests cannot make the
+# file inaccessible.  os.stat() and realpath() of one work on XP.
+test.test_os.test_os.StatAttributeTests.test_access_denied
+test.test_os.test_windows.Win32NtTests.test_stat_inaccessible_file
+test.test_ntpath.TestNtpath.test_realpath_permission
+
+# setUp runs "fsutil volume list", which XP's fsutil lacks.
+# os.listdrives(), listvolumes() and listmounts() agree with mountvol.exe.
+test.test_os.test_windows.Win32ListdriveTests.test_listdrives
+test.test_os.test_windows.Win32ListdriveTests.test_listmounts
+test.test_os.test_windows.Win32ListdriveTests.test_listvolumes
+
+# They run icacls.exe too.
+test.test_tempfile.TestMkdtemp.test_mode_win32
+test.test_tempfile.TestMkdtemp.test_read_only_directory
+test.test_tempfile.TestMkstempInner.test_read_only_directory
+
+# ctypes.util.dllist() works, but XP's loader says "kernel32.dll" and the
+# test looks for "KERNEL32.DLL" case-sensitively.
+test.test_ctypes.test_dllist.ListSharedLibraries.test_lists_system
+
+# It expects DeleteKeyEx to raise NotImplementedError on XP, as when winreg
+# looked RegDeleteKeyExW up at run time.  It calls it directly now, and
+# xpcompat's fallback works (32-bit XP has no registry views).
+test.test_winreg.LocalWinregTests.test_reflection_unsupported
+
+# The test machine.
+
+# Code pages 708 and 20106 are optional on XP and not installed there:
+# IsValidCodePage() is 0 and conversions fail with WinError 87.
+test.test_codecs.CodePageTest.test_cp708
+test.test_codecs.CodePageTest.test_cp20106
+
+# No IPv6 stack (optional on XP): getaddrinfo() of an IPv6 literal fails
+# with 11001, and the test has no IPv6 guard.
+test.test_httpservers.ScriptTestCase.test_server_test_ipv6
+
+# Its registry maps .mp2 to video/mpeg.
+test.test_mimetypes.MimeTypesModuleTestCase.test_guess_file_type
+
+# Its SSH server sets APPDATA with forward slashes: the test normalizes the
+# child's USER_BASE line with normpath() but not the expected one.
+test.test_site.CommandLineTests.test_no_args
+
+# The copy run there is laid out as an installation without headers
+# (no Include\pyconfig.h beside it).
+test.test_sysconfig.TestSysConfig.test_get_config_h_filename

@@ -1117,17 +1117,29 @@ _io__WindowsConsoleIO_write_impl(winconsoleio *self, PyTypeObject *cls,
     Py_END_ALLOW_THREADS
 
     if (!wlen) {
+#ifdef _Py_TARGET_XP
+        /* XP's UTF-8 decoder drops invalid bytes rather than make U+FFFD:
+           a chunk of only those decodes to nothing, but is written. */
+        return PyLong_FromSsize_t(len);
+#else
         return PyLong_FromLong(0);
+#endif
     }
 
-    wbuf = (wchar_t*)PyMem_Malloc(wlen * sizeof(wchar_t));
+    DWORD wcap = wlen;
+#ifdef _Py_TARGET_XP
+    /* And it needs one more wchar than its size query said when invalid
+       bytes follow (else ERROR_INSUFFICIENT_BUFFER). */
+    wcap++;
+#endif
+    wbuf = (wchar_t*)PyMem_Malloc(wcap * sizeof(wchar_t));
     if (!wbuf) {
         PyErr_NoMemory();
         return NULL;
     }
 
     Py_BEGIN_ALLOW_THREADS
-    wlen = MultiByteToWideChar(CP_UTF8, 0, b->buf, len, wbuf, wlen);
+    wlen = MultiByteToWideChar(CP_UTF8, 0, b->buf, len, wbuf, wcap);
     if (wlen) {
         res = WriteConsoleW(handle, wbuf, wlen, &n, NULL);
 #ifdef Py_DEBUG

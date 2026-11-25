@@ -18,6 +18,9 @@ from pegen.tokenizer import Tokenizer
 
 MOD_DIR = pathlib.Path(__file__).resolve().parent
 
+# A mingw Python builds extensions with GCC (setuptools' mingw32 compiler).
+MSVC = sys.platform == "win32" and not sysconfig.get_platform().startswith("mingw")
+
 TokenDefinitions = tuple[dict[int, str], dict[str, int], set[str]]
 Incomplete = Any  # TODO: install `types-setuptools` and remove this alias
 
@@ -113,7 +116,7 @@ def compile_c_extension(
     if keep_asserts:
         extra_compile_args.append("-UNDEBUG")
     if disable_optimization:
-        if sys.platform == "win32":
+        if MSVC:
             extra_compile_args.append("/Od")
             extra_link_args.append("/LTCG:OFF")
         else:
@@ -180,7 +183,7 @@ def compile_c_extension(
     if library_dir:
         library_filename = compiler.library_filename(extension_name, output_dir=library_dir)
         if newer_group(common_sources, library_filename, "newer"):
-            if sys.platform == "win32":
+            if MSVC:
                 assert compiler.static_lib_format
                 pdb = compiler.static_lib_format % (extension_name, ".pdb")
                 compile_opts = [f"/Fd{library_dir}\\{pdb}"]
@@ -196,7 +199,7 @@ def compile_c_extension(
             compiler.create_static_lib(
                 objects, extension_name, output_dir=library_dir, debug=cmd.debug
             )
-        if sys.platform == "win32":
+        if MSVC:
             compiler.add_library_dir(library_dir)
             extension.libraries = [extension_name]
         elif sys.platform == "darwin":

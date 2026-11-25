@@ -227,7 +227,7 @@
 #endif
 
 
-#ifdef _MSC_VER
+#if defined(_MSC_VER) || defined(__MINGW32__)
 #  ifdef HAVE_DIRECT_H
 #    include <direct.h>
 #  endif
@@ -282,7 +282,7 @@
 #  define HAVE_OPENDIR    1
 #  define HAVE_SYSTEM     1
 #  include <process.h>
-#elif defined( _MSC_VER)
+#elif defined(_MSC_VER) || defined(__MINGW32__)
   /* Microsoft compiler */
 #  if defined(MS_WINDOWS_DESKTOP) || defined(MS_WINDOWS_APP) || defined(MS_WINDOWS_SYSTEM)
 #    define HAVE_GETPPID    1
@@ -1801,7 +1801,7 @@ error:
 */
 #include <crt_externs.h>
 #define USE_DARWIN_NS_GET_ENVIRON 1
-#elif !defined(_MSC_VER) && (!defined(__WATCOMC__) || defined(__QNX__) || defined(__VXWORKS__))
+#elif !defined(MS_WINDOWS) && (!defined(__WATCOMC__) || defined(__QNX__) || defined(__VXWORKS__))
 extern char **environ;
 #endif /* !_MSC_VER */
 
@@ -5729,7 +5729,7 @@ os__path_splitroot_impl(PyObject *module, path_t *path)
 /*[clinic end generated code: output=ab7f1a88b654581c input=d356de1edb6050a2]*/
 {
     wchar_t *buffer;
-    wchar_t *end;
+    const wchar_t *end;
     PyObject *result = NULL;
     HRESULT ret;
 
@@ -7543,7 +7543,7 @@ os_execv_impl(PyObject *module, path_t *path, PyObject *argv)
 
     _Py_BEGIN_SUPPRESS_IPH
 #ifdef HAVE_WEXECV
-    _wexecv(path->wide, argvlist);
+    _wexecv(path->wide, (const wchar_t *const *)argvlist);
 #else
     execv(path->narrow, argvlist);
 #endif
@@ -7631,7 +7631,7 @@ os_execve_impl(PyObject *module, path_t *path, PyObject *argv, PyObject *env)
     else
 #endif
 #ifdef HAVE_WEXECV
-        _wexecve(path->wide, argvlist, envlist);
+        _wexecve(path->wide, (const wchar_t *const *)argvlist, (const wchar_t *const *)envlist);
 #else
         execve(path->narrow, argvlist, envlist);
 #endif
@@ -8304,7 +8304,7 @@ os_spawnv_impl(PyObject *module, int mode, path_t *path, PyObject *argv)
     Py_BEGIN_ALLOW_THREADS
     _Py_BEGIN_SUPPRESS_IPH
 #ifdef HAVE_WSPAWNV
-    spawnval = _wspawnv(mode, path->wide, argvlist);
+    spawnval = _wspawnv(mode, path->wide, (const wchar_t *const *)argvlist);
 #elif defined(HAVE_RTPSPAWN)
     spawnval = _rtp_spawn(mode, path->narrow, (const char **)argvlist, NULL);
 #else
@@ -8426,7 +8426,8 @@ os_spawnve_impl(PyObject *module, int mode, path_t *path, PyObject *argv,
     Py_BEGIN_ALLOW_THREADS
     _Py_BEGIN_SUPPRESS_IPH
 #ifdef HAVE_WSPAWNV
-    spawnval = _wspawnve(mode, path->wide, argvlist, envlist);
+    spawnval = _wspawnve(mode, path->wide, (const wchar_t *const *)argvlist,
+                         (const wchar_t *const *)envlist);
 #elif defined(HAVE_RTPSPAWN)
     spawnval = _rtp_spawn(mode, path->narrow, (const char **)argvlist,
                            (const char **)envlist);

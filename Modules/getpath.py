@@ -42,6 +42,7 @@
 # VERSION_MINOR     -- [in] sys.version_info.minor
 # ABI_THREAD        -- [in] either 't' for free-threaded builds or ''
 # PYWINVER          -- [in] the Windows platform-specific version (e.g. 3.8-32)
+# STDLIB_FROZEN     -- [in] non-zero if the whole stdlib is frozen into the binary
 
 # ** Values read from the environment **
 #   There is no need to check the use_environment flag before reading
@@ -605,6 +606,12 @@ else:
         if not stdlib_dir_was_set_in_config:
             stdlib_dir = None
 
+    # When the whole stdlib is frozen, no landmark is needed: the prefix is
+    # the directory of the runtime library, or of the executable (which is
+    # 'home' in a virtual environment).
+    if STDLIB_FROZEN and not prefix:
+        prefix = dirname(library) if library and not venv_prefix else executable_dir
+
 
     # First try to detect prefix by looking alongside our runtime library, if known
     if library and not prefix:
@@ -748,7 +755,7 @@ elif not pythonpath_was_set:
         stdlib_zip = joinpath(base_prefix, ZIP_LANDMARK)
     pythonpath.append(stdlib_zip)
 
-    if os_name == 'nt' and use_environment and winreg:
+    if os_name == 'nt' and use_environment and winreg and not STDLIB_FROZEN:
         # QUIRK: Windows also lists paths in the registry. Paths are stored
         # as the default value of each subkey of
         # {HKCU,HKLM}\Software\Python\PythonCore\{winver}\PythonPath
@@ -810,6 +817,11 @@ elif not pythonpath_was_set:
     config['module_search_paths'] = pythonpath
     config['module_search_paths_set'] = 1
 
+# Frozen modules locate their __file__ and __path__ under stdlib_dir, so a
+# frozen stdlib always gets one, even when the search path was given.
+if STDLIB_FROZEN and not stdlib_dir and base_prefix:
+    stdlib_dir = joinpath(base_prefix, STDLIB_SUBDIR)
+
 
 # ******************************************************************************
 # SANITY CHECKS
@@ -818,7 +830,7 @@ elif not pythonpath_was_set:
 # Warn if we did a search for the standard library and couldn't find it. Never
 # show a warning if paths were provided explicitly, since we trust the caller
 # knows what they're doing even if the layout doesn't look "normal".
-if not (py_setpath or pythonpath_was_set or pth):
+if not (py_setpath or pythonpath_was_set or pth or STDLIB_FROZEN):
     home_hint = f"The Python 'home' directory was set to {home!r}, is this correct?"
     if (not stdlib_zip or not isfile(stdlib_zip)) and (not stdlib_dir or not isdir(stdlib_dir)):
         hint = home_hint if home else f'sys.prefix is set to {prefix}, is this correct?'

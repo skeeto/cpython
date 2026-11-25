@@ -155,7 +155,8 @@ static char *GetPythonImport (HINSTANCE hModule)
    _Py_CheckPython3t will check for python3t.dll in that case.
 */
 extern HMODULE PyWin_DLLhModule;
-static int
+/* Not static: Include/pylifecycle.h declares it. */
+int
 _Py_CheckPython3(void)
 {
 #ifndef PY3_DLLNAME
@@ -371,6 +372,10 @@ dl_funcptr _PyImport_FindSharedFuncptrWindows(const char *prefix,
         } else {
             char buffer[256];
 
+#ifdef PY_DLL_NAME
+            /* The build names its runtime DLL (pyconfig.h). */
+            PyOS_snprintf(buffer, sizeof(buffer), "%s", PY_DLL_NAME);
+#else
             PyOS_snprintf(buffer, sizeof(buffer),
 #ifdef Py_DEBUG
                           "python%d%d_d.dll",
@@ -378,6 +383,7 @@ dl_funcptr _PyImport_FindSharedFuncptrWindows(const char *prefix,
                           "python%d%d.dll",
 #endif
                           PY_MAJOR_VERSION,PY_MINOR_VERSION);
+#endif
             import_python = GetPythonImport(hDLL);
 
             if (import_python &&

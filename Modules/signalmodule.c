@@ -432,10 +432,19 @@ signal_raise_signal_impl(PyObject *module, int signalnum)
     int err;
     Py_BEGIN_ALLOW_THREADS
     _Py_BEGIN_SUPPRESS_IPH
+#ifdef __MINGW32__
+    errno = 0;
+#endif
     err = raise(signalnum);
     _Py_END_SUPPRESS_IPH
     Py_END_ALLOW_THREADS
 
+#ifdef __MINGW32__
+    /* XP's msvcrt.dll fails an unsupported signal without setting errno. */
+    if (err && errno == 0) {
+        errno = EINVAL;
+    }
+#endif
     if (err) {
         return PyErr_SetFromErrno(PyExc_OSError);
     }

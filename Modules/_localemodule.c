@@ -205,7 +205,9 @@ is_all_ascii(const char *str)
 static int
 locale_decode_monetary(PyObject *dict, struct lconv *lc)
 {
-#ifndef MS_WINDOWS
+/* _Py_NO_LCONV_W: the C runtime's struct lconv has no _W_* fields
+   (msvcrt.dll before Windows 7). */
+#if !defined(MS_WINDOWS) || defined(_Py_NO_LCONV_W)
     int change_locale;
     change_locale = (!locale_is_ascii(lc->int_curr_symbol)
                      || !locale_is_ascii(lc->currency_symbol)
@@ -273,7 +275,7 @@ locale_decode_monetary(PyObject *dict, struct lconv *lc)
     res = 0;
 
 done:
-#ifndef MS_WINDOWS
+#if !defined(MS_WINDOWS) || defined(_Py_NO_LCONV_W)
     if (loc != NULL) {
         setlocale(LC_CTYPE, oldloc);
     }
@@ -318,7 +320,7 @@ _locale_localeconv_impl(PyObject *module)
         Py_DECREF(obj); \
     } while (0)
 
-#ifdef MS_WINDOWS
+#if defined(MS_WINDOWS) && !defined(_Py_NO_LCONV_W)
 /* Use _W_* fields of Windows struct lconv */
 #define GET_LOCALE_STRING(ATTR) PyUnicode_FromWideChar(lc->_W_ ## ATTR, -1)
 #else

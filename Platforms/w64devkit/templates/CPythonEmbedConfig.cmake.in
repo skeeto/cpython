@@ -1,0 +1,41 @@
+# CPythonEmbed: embed this CPython (w64devkit, @PY_PLATFORM_TAG@).
+#
+#   find_package(CPythonEmbed @PY_SHORT@ REQUIRED)
+#   target_link_libraries(app PRIVATE CPythonEmbed::Static)   # or ::Shared
+#
+# CPythonEmbed::Python is the interpreter program, when installed.
+
+if(NOT CMAKE_SIZEOF_VOID_P EQUAL @CMAKE_SIZEOF_VOID_P@)
+  set(CPythonEmbed_FOUND FALSE)
+  set(CPythonEmbed_NOT_FOUND_MESSAGE
+      "CPythonEmbed at ${CMAKE_CURRENT_LIST_DIR} is @PY_ARCH_BITS@-bit, this project is not")
+  return()
+endif()
+
+get_filename_component(_cpe_prefix "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
+set(CPythonEmbed_VERSION_FULL "@PY_VERSION@")
+set(CPythonEmbed_INCLUDE_DIR "${_cpe_prefix}/include/@PY_INCLUDE_SUBDIR@")
+
+if(EXISTS "${_cpe_prefix}/lib/@PY_IMPORT_LIB_NAME@" AND NOT TARGET CPythonEmbed::Shared)
+  add_library(CPythonEmbed::Shared SHARED IMPORTED)
+  set_target_properties(CPythonEmbed::Shared PROPERTIES
+    IMPORTED_IMPLIB "${_cpe_prefix}/lib/@PY_IMPORT_LIB_NAME@"
+    IMPORTED_LOCATION "${_cpe_prefix}/bin/@PY_DLL_NAME@"
+    INTERFACE_INCLUDE_DIRECTORIES "${CPythonEmbed_INCLUDE_DIR}")
+endif()
+if(EXISTS "${_cpe_prefix}/lib/@PY_STATIC_LIB_NAME@" AND NOT TARGET CPythonEmbed::Static)
+  add_library(CPythonEmbed::Static STATIC IMPORTED)
+  set_target_properties(CPythonEmbed::Static PROPERTIES
+    IMPORTED_LOCATION "${_cpe_prefix}/lib/@PY_STATIC_LIB_NAME@"
+    IMPORTED_LINK_INTERFACE_LANGUAGES C
+    INTERFACE_INCLUDE_DIRECTORIES "${CPythonEmbed_INCLUDE_DIR}"
+    INTERFACE_COMPILE_DEFINITIONS Py_NO_ENABLE_SHARED
+    INTERFACE_LINK_LIBRARIES "@PY_SYSTEM_LIBS@")
+endif()
+if(EXISTS "${_cpe_prefix}/bin/@PY_BASENAME@@PY_DEBUG_EXT@.exe" AND NOT TARGET CPythonEmbed::Python)
+  add_executable(CPythonEmbed::Python IMPORTED)
+  set_target_properties(CPythonEmbed::Python PROPERTIES
+    IMPORTED_LOCATION "${_cpe_prefix}/bin/@PY_BASENAME@@PY_DEBUG_EXT@.exe")
+endif()
+unset(_cpe_prefix)
+set(CPythonEmbed_FOUND TRUE)

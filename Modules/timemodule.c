@@ -780,6 +780,113 @@ the C library strftime function.\n"
 #define time_strlen strlen
 #endif
 
+#ifdef __MINGW32__
+/* msvcrt.dll's strftime knows only the C89 directives and rejects the rest
+   with EINVAL.  Rewrite the C99 ones: drop the E and O modifiers (C99: an
+   unavailable alternative form is the normal one), expand the aliases, and
+   compute %e %C %u %g %G %V %y %z as literal text (msvcrt
+   rejects %y before 1900, and its %z is the zone name where C99 and UCRT
+   give +hhmm).  OUT holds 6*len+1 chars. */
+static int
+mingw_iso_weeks(int y)
+{
+#define P(y) (((y) + (y)/4 - (y)/100 + (y)/400) % 7)
+    return (P(y) == 4 || P(y - 1) == 3) ? 53 : 52;
+#undef P
+}
+
+static size_t
+mingw_c99_format(const time_char *in, size_t len, time_char *out,
+                 const struct tm *tm)
+{
+    size_t n = 0;
+    for (size_t i = 0; i < len; i++) {
+        if (in[i] == '%' && i + 1 >= len) {
+            /* A trailing '%': msvcrt.dll rejects it (EINVAL), but XP's
+               reads on past the terminator. */
+            return (size_t)-1;
+        }
+        if (in[i] != '%') {
+            out[n++] = in[i];
+            continue;
+        }
+        size_t j = i + 1;
+        /* msvcrt's '#' flag: kept for msvcrt's directives, ignored for
+           the ones computed here.  A format ending in it is invalid, as
+           one ending in '%'. */
+        int hash = 0;
+        if (in[j] == '#') {
+            if (j + 1 >= len) {
+                return (size_t)-1;
+            }
+            hash = 1;
+            j++;
+        }
+        if ((in[j] == 'E' || in[j] == 'O') && j + 1 < len) {
+            j++;
+            if (in[j] == '#' && j + 1 >= len) {
+                return (size_t)-1;              /* "%E#" passes on "%#" */
+            }
+        }
+        const char *alias = NULL;
+        char lit[16] = {0};
+        int year = tm->tm_year + 1900;
+        int wday = (tm->tm_wday + 6) % 7;   /* Monday is 0 */
+        int week = (tm->tm_yday - wday + 10) / 7;
+        if (week < 1) {
+            year--;
+            week = mingw_iso_weeks(year);
+        }
+        else if (week > mingw_iso_weeks(year)) {
+            year++;
+            week = 1;
+        }
+        switch (in[j]) {
+        case 'F': alias = "%Y-%m-%d"; break;
+        case 'T': alias = "%H:%M:%S"; break;
+        case 'D': alias = "%m/%d/%y"; break;
+        case 'R': alias = "%H:%M"; break;
+        case 'r': alias = "%I:%M:%S %p"; break;
+        case 'h': alias = "%b"; break;
+        case 'n': alias = "\n"; break;
+        case 't': alias = "\t"; break;
+        case 'e': snprintf(lit, sizeof(lit), "%2d", tm->tm_mday); break;
+        case 'C': snprintf(lit, sizeof(lit), "%02d", (tm->tm_year + 1900) / 100); break;
+        case 'u': snprintf(lit, sizeof(lit), "%d", wday + 1); break;
+        case 'G': snprintf(lit, sizeof(lit), "%04d", year); break;
+        case 'y': snprintf(lit, sizeof(lit), "%02d", (tm->tm_year + 1900) % 100); break;
+        case 'g': snprintf(lit, sizeof(lit), "%02d", year % 100); break;
+        case 'V': snprintf(lit, sizeof(lit), "%02d", week); break;
+        case 'z': {
+            /* As UCRT computes it: any nonzero tm_isdst means DST. */
+            long off = -(_timezone + (tm->tm_isdst ? _dstbias : 0));
+            snprintf(lit, sizeof(lit), "%c%02ld%02ld", off < 0 ? '-' : '+',
+                     labs(off) / 3600, labs(off) / 60 % 60);
+            break;
+        }
+        }
+        if (!alias && lit[0]) {
+            alias = lit;
+        }
+        if (alias) {
+            while (*alias) {
+                out[n++] = (time_char)*alias++;
+            }
+        }
+        else {
+            out[n++] = '%';
+            if (hash) {
+                out[n++] = '#';
+            }
+            out[n++] = in[j];
+        }
+        i = j;
+    }
+    out[n] = 0;
+    return n;
+}
+#endif
+
 static PyObject *
 time_strftime1(time_char **outbuf, size_t *bufsize,
                time_char *format, size_t fmtlen,
@@ -836,13 +943,15 @@ time_strftime1(time_char **outbuf, size_t *bufsize,
             return NULL;
         }
         *outbuf = tmp;
-#if defined _MSC_VER && _MSC_VER >= 1400 && defined(__STDC_SECURE_LIB__)
+#if (defined _MSC_VER && _MSC_VER >= 1400 && defined(__STDC_SECURE_LIB__)) \
+    || defined(__MINGW32__)
         errno = 0;
 #endif
         _Py_BEGIN_SUPPRESS_IPH
         buflen = format_time(*outbuf, *bufsize, format, tm);
         _Py_END_SUPPRESS_IPH
-#if defined _MSC_VER && _MSC_VER >= 1400 && defined(__STDC_SECURE_LIB__)
+#if (defined _MSC_VER && _MSC_VER >= 1400 && defined(__STDC_SECURE_LIB__)) \
+    || defined(__MINGW32__)
         /* VisualStudio .NET 2005 does this properly */
         if (buflen == 0 && errno == EINVAL) {
             PyErr_SetString(PyExc_ValueError, "Invalid format string");
@@ -898,7 +1007,8 @@ time_strftime(PyObject *module, PyObject *args)
 //
 // Android works with negative years on the emulator, but fails on some
 // physical devices (#123017).
-#if defined(_MSC_VER) || (defined(__sun) && defined(__SVR4)) || defined(_AIX) \
+#if defined(_MSC_VER) || defined(__MINGW32__) \
+    || (defined(__sun) && defined(__SVR4)) || defined(_AIX) \
     || defined(__VXWORKS__) || defined(__ANDROID__)
     if (buf.tm_year + 1900 < 1 || 9999 < buf.tm_year + 1900) {
         PyErr_SetString(PyExc_ValueError,
@@ -925,6 +1035,19 @@ time_strftime(PyObject *module, PyObject *args)
         PyErr_NoMemory();
         return NULL;
     }
+#ifdef __MINGW32__
+    if ((size_t)format_size > (PY_SSIZE_T_MAX/sizeof(time_char) - 1) / 6) {
+        PyMem_Free(format);
+        PyErr_NoMemory();
+        return NULL;
+    }
+    time_char *xformat = PyMem_Malloc((6*format_size + 1)*sizeof(time_char));
+    if (xformat == NULL) {
+        PyMem_Free(format);
+        PyErr_NoMemory();
+        return NULL;
+    }
+#endif
     PyUnicodeWriter *writer = PyUnicodeWriter_Create(0);
     if (writer == NULL) {
         goto error;
@@ -941,8 +1064,18 @@ time_strftime(PyObject *module, PyObject *args)
         }
         if (fmtlen) {
             format[fmtlen] = 0;
+#ifdef __MINGW32__
+            fmtlen = mingw_c99_format(format, fmtlen, xformat, &buf);
+            if (fmtlen == (size_t)-1) {
+                PyErr_SetString(PyExc_ValueError, "Invalid format string");
+                goto error;
+            }
+            PyObject *unicode = time_strftime1(&outbuf, &bufsize,
+                                               xformat, fmtlen, &buf);
+#else
             PyObject *unicode = time_strftime1(&outbuf, &bufsize,
                                                format, fmtlen, &buf);
+#endif
             if (unicode == NULL) {
                 goto error;
             }
@@ -967,10 +1100,16 @@ time_strftime(PyObject *module, PyObject *args)
 
     PyMem_Free(outbuf);
     PyMem_Free(format);
+#ifdef __MINGW32__
+    PyMem_Free(xformat);
+#endif
     return PyUnicodeWriter_Finish(writer);
 error:
     PyMem_Free(outbuf);
     PyMem_Free(format);
+#ifdef __MINGW32__
+    PyMem_Free(xformat);
+#endif
     PyUnicodeWriter_Discard(writer);
     return NULL;
 }

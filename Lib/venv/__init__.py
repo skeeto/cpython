@@ -17,6 +17,32 @@ import shlex
 CORE_VENV_DEPS = ('pip',)
 logger = logging.getLogger(__name__)
 
+_extracted_scripts = None
+
+
+def _scripts_dir():
+    """Return the directory of this package's scripts.
+
+    A frozen stdlib may have them only as resources embedded in the
+    interpreter: extract them once, to a directory removed at exit.
+    """
+    global _extracted_scripts
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'scripts')
+    if os.path.isdir(path):
+        return path
+    if _extracted_scripts is None:
+        import atexit
+        import contextlib
+        from importlib import resources
+        scripts = resources.files(__spec__.name) / 'scripts'
+        if not scripts.is_dir():
+            return path
+        stack = contextlib.ExitStack()
+        atexit.register(stack.close)
+        _extracted_scripts = os.fspath(
+            stack.enter_context(resources.as_file(scripts)))
+    return _extracted_scripts
+
 
 class EnvBuilder:
     """
@@ -335,8 +361,7 @@ class EnvBuilder:
             if sysconfig.is_python_build():
                 scripts = dirname
             else:
-                scripts = os.path.join(os.path.dirname(__file__),
-                                       'scripts', 'nt')
+                scripts = os.path.join(_scripts_dir(), 'nt')
             if not sysconfig.get_config_var("Py_GIL_DISABLED"):
                 python_exe = os.path.join(dirname, f'python{exe_d}.exe')
                 pythonw_exe = os.path.join(dirname, f'pythonw{exe_d}.exe')
@@ -465,9 +490,7 @@ class EnvBuilder:
         'scripts' directory in the venv package is used as the source of
         scripts to install.
         """
-        path = os.path.abspath(os.path.dirname(__file__))
-        path = os.path.join(path, 'scripts')
-        self.install_scripts(context, path)
+        self.install_scripts(context, _scripts_dir())
 
     def post_setup(self, context):
         """

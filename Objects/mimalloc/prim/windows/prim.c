@@ -884,8 +884,11 @@ static void NTAPI mi_win_main(PVOID module, DWORD reason, LPVOID reserved) {
       mi_crt_callback_t _mi_crt_callback_init[] = { &mi_crt_init };
     #pragma data_seg()
   #elif defined(__MINGW32__)
-    extern const IMAGE_TLS_DIRECTORY _tls_used;
-    __attribute__((used)) static const void* const mi_tls_used_ref = &_tls_used; // pull in the CRT tls
+    // pull in the CRT tls: mingw-w64's tlssup.o defines both _tls_used and
+    // _tls_index.  Referencing _tls_index also works in a relocatable link
+    // (ld -r), which refuses an undefined _tls_used.
+    extern ULONG _tls_index;
+    __attribute__((used)) static const void* const mi_tls_used_ref = &_tls_index;
     __attribute__((used, section(".CRT$XLB"))) PIMAGE_TLS_CALLBACK _mi_tls_callback_pre = &mi_tls_attach;
     __attribute__((used, section(".CRT$XLY"))) PIMAGE_TLS_CALLBACK _mi_tls_callback_post = &mi_tls_detach;
     __attribute__((used, section(".CRT$XIB"))) mi_crt_callback_t   _mi_crt_callback_init = &mi_crt_init;
@@ -981,8 +984,11 @@ static void NTAPI mi_win_main(PVOID module, DWORD reason, LPVOID reserved) {
       PIMAGE_TLS_CALLBACK _mi_tls_callback_post[] = { &mi_tls_detach };
     #pragma data_seg()
   #elif defined(__MINGW32__)
-    extern const IMAGE_TLS_DIRECTORY _tls_used;
-    __attribute__((used)) static const void* const mi_tls_used_ref = &_tls_used; // pull in the CRT tls
+    // pull in the CRT tls: mingw-w64's tlssup.o defines both _tls_used and
+    // _tls_index.  Referencing _tls_index also works in a relocatable link
+    // (ld -r), which refuses an undefined _tls_used.
+    extern ULONG _tls_index;
+    __attribute__((used)) static const void* const mi_tls_used_ref = &_tls_index;
     __attribute__((used, section(".CRT$XLB"))) PIMAGE_TLS_CALLBACK _mi_tls_callback_pre  = &mi_tls_attach;
     __attribute__((used, section(".CRT$XLY"))) PIMAGE_TLS_CALLBACK _mi_tls_callback_post = &mi_tls_detach;
   #endif
@@ -1055,8 +1061,11 @@ static void NTAPI mi_win_main(PVOID module, DWORD reason, LPVOID reserved) {
     PIMAGE_TLS_CALLBACK _mi_tls_callback_post[] = { &mi_win_main_detach };
     #pragma data_seg()
   #elif defined(__MINGW32__)
-    extern const IMAGE_TLS_DIRECTORY _tls_used;
-    __attribute__((used)) static const void* const mi_tls_used_ref = &_tls_used; // pull in the CRT tls
+    // pull in the CRT tls: mingw-w64's tlssup.o defines both _tls_used and
+    // _tls_index.  Referencing _tls_index also works in a relocatable link
+    // (ld -r), which refuses an undefined _tls_used.
+    extern ULONG _tls_index;
+    __attribute__((used)) static const void* const mi_tls_used_ref = &_tls_index;
     __attribute__((used, section(".CRT$XLB"))) PIMAGE_TLS_CALLBACK _mi_tls_callback_pre  = &mi_tls_attach;
     __attribute__((used, section(".CRT$XLY"))) PIMAGE_TLS_CALLBACK _mi_tls_callback_post = &mi_tls_detach;
   #endif

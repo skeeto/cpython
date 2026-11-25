@@ -58,6 +58,12 @@ struct _gil_runtime_state {
     PyCOND_T switch_cond;
     PyMUTEX_T switch_mutex;
 #endif
+#ifdef _Py_TARGET_XP
+    /* Next ticket, and whose turn it is to take the GIL (0: anyone's).
+       See take_gil() in Python/ceval_gil.c.  Protected by mutex. */
+    unsigned long long xp_next_ticket;
+    unsigned long long xp_turn;
+#endif
 };
 
 #ifdef __cplusplus

@@ -1,0 +1,31 @@
+# Run a program alone: copy FILES (|-separated; the first is the program)
+# into an empty WORK/home, run it with ARGS (|-separated; @HOME@ is
+# replaced by that directory) from WORK, and require exit status 0, empty
+# stderr and, if given, stdout matching EXPECT.
+cmake_minimum_required(VERSION 3.30)
+string(REPLACE "|" ";" FILES "${FILES}")
+string(REPLACE "|" ";" ARGS "${ARGS}")
+set(home "${WORK}/home")
+file(REMOVE_RECURSE "${WORK}")
+file(MAKE_DIRECTORY "${home}")
+list(GET FILES 0 prog)
+foreach(f IN LISTS FILES)
+  if(NOT f STREQUAL "")
+    file(COPY "${f}" DESTINATION "${home}")
+  endif()
+endforeach()
+cmake_path(GET prog FILENAME name)
+string(REPLACE "@HOME@" "${home}" ARGS "${ARGS}")
+execute_process(COMMAND "${home}/${name}" ${ARGS}
+  WORKING_DIRECTORY "${WORK}"
+  RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+message("${out}")
+if(NOT rc EQUAL 0)
+  message(FATAL_ERROR "exit status ${rc}\n${err}")
+endif()
+if(NOT err STREQUAL "")
+  message(FATAL_ERROR "unexpected stderr:\n${err}")
+endif()
+if(EXPECT AND NOT out MATCHES "${EXPECT}")
+  message(FATAL_ERROR "stdout does not match: ${EXPECT}")
+endif()

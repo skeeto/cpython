@@ -368,7 +368,13 @@ static void mi_out_buf_flush(mi_output_fun* out, bool no_more_buf, void* arg) {
     if (count>MI_MAX_DELAY_OUTPUT) count = MI_MAX_DELAY_OUTPUT;
     out_buf[count] = 0;
     out(out_buf,arg);
+    #if defined(__MINGW32__)
+    // mingw runs both the TLS callback and the constructor, so this is
+    // flushed twice at startup: only separate actual output.
+    if (!no_more_buf && count > 0) {
+    #else
     if (!no_more_buf) {
+    #endif
       out_buf[count] = '\n'; // if continue with the buffer, insert a newline
     }
   }

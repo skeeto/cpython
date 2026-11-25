@@ -1588,9 +1588,40 @@ def _set_bootstrap_module(_bootstrap_module):
     _bootstrap = _bootstrap_module
 
 
+def _frozen_stdlib_path_hook(path):
+    """Path hook for a directory of a frozen stdlib whose sources are not
+    on disk.
+
+    Its finder returns the specs of the frozen modules there and lists them
+    (pkgutil.iter_modules), along with whatever is on disk there.
+    """
+    stdlib = getattr(sys, '_stdlib_dir', None)
+    if not stdlib or not path:
+        raise ImportError('not a frozen stdlib directory', path=path)
+    if path == stdlib:
+        package = ''
+        landmark = 'os.py'
+    elif path.startswith(stdlib + path_sep):
+        package = path[len(stdlib) + 1:].replace(path_sep, '.')
+        if not _imp.is_frozen(package) or not _imp.is_frozen_package(package):
+            raise ImportError('not a frozen stdlib directory', path=path)
+        landmark = '__init__.py'
+    else:
+        raise ImportError('not a frozen stdlib directory', path=path)
+    # The stdlib's sources on disk: FileFinder, as in a stock build.  A
+    # directory without them (say Lib holding only site-packages) gets the
+    # frozen finder, which also finds what is there.
+    if _path_isfile(_path_join(path, landmark)):
+        raise ImportError('a frozen stdlib directory on disk', path=path)
+    import _frozen_stdlib
+    return _frozen_stdlib.Finder(path, package)
+
+
 def _install(_bootstrap_module):
     """Install the path-based import components."""
     _set_bootstrap_module(_bootstrap_module)
     supported_loaders = _get_supported_file_loaders()
+    if getattr(_imp, '_stdlib_frozen', False):
+        sys.path_hooks.append(_frozen_stdlib_path_hook)
     sys.path_hooks.extend([FileFinder.path_hook(*supported_loaders)])
     sys.meta_path.append(PathFinder)

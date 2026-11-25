@@ -1,0 +1,9 @@
+# Compile Python extension modules: link nothing, as in the stock python.pc.
+prefix=${pcfiledir}/../..
+includedir=${prefix}/include
+
+Name: Python
+Description: Build a C extension for Python (w64devkit, @PY_PLATFORM_TAG@)
+Version: @PY_SHORT@
+Cflags: -I${includedir}/@PY_INCLUDE_SUBDIR@
+Libs: -L${prefix}/lib -l:@PY_IMPORT_LIB_NAME@

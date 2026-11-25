@@ -171,6 +171,10 @@ static void create_gil(struct _gil_runtime_state *gil)
     COND_INIT(gil->switch_cond);
 #endif
     _Py_atomic_store_ptr_relaxed(&gil->last_holder, 0);
+#ifdef _Py_TARGET_XP
+    gil->xp_next_ticket = 0;
+    gil->xp_turn = 0;
+#endif
     _Py_ANNOTATE_RWLOCK_CREATE(&gil->locked);
     _Py_atomic_store_int_release(&gil->locked, 0);
 }
@@ -209,6 +213,15 @@ drop_gil_impl(PyThreadState *tstate, struct _gil_runtime_state *gil)
         tstate->holds_gil = 0;
         tstate->gil_requested = 0;
     }
+#ifdef _Py_TARGET_XP
+    if (gil->xp_turn != 0) {
+        /* Wake the thread whose turn it is (see take_gil). */
+        if (PyCOND_BROADCAST(&gil->cond)) {
+            Py_FatalError("PyCOND_BROADCAST(gil->cond) failed");
+        }
+    }
+    else
+#endif
     COND_SIGNAL(gil->cond);
     MUTEX_UNLOCK(gil->mutex);
 }
@@ -324,7 +337,19 @@ take_gil(PyThreadState *tstate)
     tstate->gil_requested = 1;
 
     int drop_requested = 0;
-    while (_Py_atomic_load_int_relaxed(&gil->locked)) {
+#ifdef _Py_TARGET_XP
+    /* Windows XP: with its emulated condition variable, the signal from
+       drop_gil() may wake any waiter, and XP's scheduler can wake the same
+       ones every time, starving a thread forever (with two CPU-bound
+       threads, the main thread never gets the GIL back).  A thread that
+       waited a whole interval takes a ticket, and the oldest ticket has the
+       next turn: the others wait while the GIL is free. */
+    unsigned long long xp_ticket = 0;
+#  define XP_NOT_MY_TURN() (gil->xp_turn != 0 && gil->xp_turn != xp_ticket)
+#else
+#  define XP_NOT_MY_TURN() 0
+#endif
+    while (_Py_atomic_load_int_relaxed(&gil->locked) || XP_NOT_MY_TURN()) {
         unsigned long saved_switchnum = gil->switch_number;
 
         unsigned long interval = _Py_atomic_load_ulong_relaxed(&gil->interval);
@@ -333,6 +358,21 @@ take_gil(PyThreadState *tstate)
         }
         int timed_out = 0;
         COND_TIMED_WAIT(gil->cond, gil->mutex, interval, timed_out);
+
+#ifdef _Py_TARGET_XP
+        /* Claim the turn on every timeout, switch or not: a thread whose
+           waits always span a switch would never request a drop.  The
+           ticket is kept for the whole wait, so the longest waiter holds
+           the oldest one, and claims the turn again after others took it. */
+        if (timed_out && _Py_atomic_load_int_relaxed(&gil->locked)) {
+            if (xp_ticket == 0) {
+                xp_ticket = ++gil->xp_next_ticket;
+            }
+            if (gil->xp_turn == 0 || xp_ticket < gil->xp_turn) {
+                gil->xp_turn = xp_ticket;
+            }
+        }
+#endif
 
         /* If we timed out and no switch occurred in the meantime, it is time
            to ask the GIL-holding thread to drop it. */
@@ -343,6 +383,11 @@ take_gil(PyThreadState *tstate)
             PyThreadState *holder_tstate =
                 (PyThreadState*)_Py_atomic_load_ptr_relaxed(&gil->last_holder);
             if (_PyThreadState_MustExit(tstate)) {
+#ifdef _Py_TARGET_XP
+                if (xp_ticket != 0 && gil->xp_turn == xp_ticket) {
+                    gil->xp_turn = 0;
+                }
+#endif
                 MUTEX_UNLOCK(gil->mutex);
                 // gh-96387: If the loop requested a drop request in a previous
                 // iteration, reset the request. Otherwise, drop_gil() can
@@ -363,6 +408,10 @@ take_gil(PyThreadState *tstate)
             drop_requested = 1;
         }
     }
+#undef XP_NOT_MY_TURN
+#ifdef _Py_TARGET_XP
+    gil->xp_turn = 0;  /* it was 0 or ours */
+#endif
 
 #ifdef Py_GIL_DISABLED
     if (!_Py_atomic_load_int_relaxed(&gil->enabled)) {

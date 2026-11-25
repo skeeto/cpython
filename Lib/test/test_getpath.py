@@ -1070,6 +1070,7 @@ DEFAULT_NAMESPACE = dict(
     ABI_THREAD="",
     PYWINVER=None,
     EXE_SUFFIX=None,
+    STDLIB_FROZEN=0,
 
     ENV_PATH="",
     ENV_PYTHONHOME="",

@@ -15,6 +15,9 @@ from test.support.script_helper import assert_python_ok
 
 if support.check_cflags_pgo():
     raise unittest.SkipTest("peg_generator test disabled under PGO build")
+import importlib.machinery
+if not importlib.machinery.EXTENSION_SUFFIXES:
+    raise unittest.SkipTest("cannot load extension modules")
 
 test_tools.skip_if_missing("peg_generator")
 with test_tools.imports_under_tool("peg_generator"):

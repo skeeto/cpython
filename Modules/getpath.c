@@ -49,6 +49,12 @@
 #endif
 #endif
 
+/* Non-zero when the whole standard library is frozen into the binary, so
+   that getpath.py needs no landmark files (see pyconfig.h). */
+#ifndef Py_STDLIB_FROZEN
+#  define Py_STDLIB_FROZEN 0
+#endif
+
 #if !defined(EXE_SUFFIX)
 #if defined(MS_WINDOWS) || defined(__CYGWIN__) || defined(__MINGW32__)
 #define EXE_SUFFIX L".exe"
@@ -938,6 +944,7 @@ _PyConfig_InitPathConfig(PyConfig *config, int compute_path_config)
         !decode_to_dict(dict, "PYDEBUGEXT", PYDEBUGEXT) ||
         !int_to_dict(dict, "VERSION_MAJOR", PY_MAJOR_VERSION) ||
         !int_to_dict(dict, "VERSION_MINOR", PY_MINOR_VERSION) ||
+        !int_to_dict(dict, "STDLIB_FROZEN", Py_STDLIB_FROZEN) ||
         !decode_to_dict(dict, "PYWINVER", PYWINVER) ||
         !wchar_to_dict(dict, "EXE_SUFFIX", EXE_SUFFIX) ||
         !env_to_dict(dict, "ENV_PATH", 0) ||

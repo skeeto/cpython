@@ -688,6 +688,13 @@ def test_sys_remote_exec():
         assertEqual(event_script_path, tmp_file.name)
         assertEqual(remote_event_script_path, tmp_file.name)
 
+def _extension_load_events(name):
+    # Loading an extension module from a file raises a second "import"
+    # event; a module built into the interpreter raises only the first.
+    if name in sys.builtin_module_names:
+        return []
+    return [(name, unittest.mock.ANY, None, None, None)]
+
 def test_import_module():
     import importlib
 
@@ -708,8 +715,7 @@ def test_import_module():
             ("test.audit_test_data", None, sys.path, sys.meta_path, sys.path_hooks),
             ("test.audit_test_data.submodule2", None, sys.path, sys.meta_path, sys.path_hooks),
             ("_testcapi", None, sys.path, sys.meta_path, sys.path_hooks),
-            ("_testcapi", unittest.mock.ANY, None, None, None)
-        ],
+        ] + _extension_load_events("_testcapi"),
         actual,
     )
 
@@ -733,8 +739,7 @@ def test_builtin__import__():
             ("test.audit_test_data", None, sys.path, sys.meta_path, sys.path_hooks),
             ("test.audit_test_data.submodule2", None, sys.path, sys.meta_path, sys.path_hooks),
             ("_testcapi", None, sys.path, sys.meta_path, sys.path_hooks),
-            ("_testcapi", unittest.mock.ANY, None, None, None)
-        ],
+        ] + _extension_load_events("_testcapi"),
         actual,
     )
 
@@ -761,8 +766,7 @@ def test_import_statement():
             ("test.audit_test_data.submodule", None, sys.path, sys.meta_path, sys.path_hooks),
             ("test.audit_test_data.submodule2", None, sys.path, sys.meta_path, sys.path_hooks),
             ("_testcapi", None, sys.path, sys.meta_path, sys.path_hooks),
-            ("_testcapi", unittest.mock.ANY, None, None, None)
-        ],
+        ] + _extension_load_events("_testcapi"),
         actual,
     )
 

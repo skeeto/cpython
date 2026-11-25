@@ -3,7 +3,7 @@ import subprocess
 import sys
 import sysconfig
 import tempfile
-from contextlib import nullcontext
+from contextlib import contextmanager, nullcontext
 from importlib import resources
 from pathlib import Path
 from shutil import copy2
@@ -44,11 +44,15 @@ def _get_pip_whl_path_ctx():
     if (alternative_pip_wheel_path := _find_wheel_pkg_dir_pip()) is not None:
         return alternative_pip_wheel_path
 
-    return resources.as_file(
-        resources.files('ensurepip')
-        / '_bundled'
-        / f'pip-{_PIP_VERSION}-py3-none-any.whl'
-    )
+    return _bundled_pip_whl_path_ctx()
+
+
+@contextmanager
+def _bundled_pip_whl_path_ctx():
+    # Extract the whole directory if the resources are not files (e.g. a
+    # zip), so that the wheel keeps its name.
+    with resources.as_file(resources.files('ensurepip') / '_bundled') as path:
+        yield path / f'pip-{_PIP_VERSION}-py3-none-any.whl'
 
 
 def _get_pip_version():

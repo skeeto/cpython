@@ -3224,7 +3224,7 @@ exit:
     return return_value;
 }
 
-#if defined(_MSC_VER)
+#if defined(MS_WINDOWS)
 
 PyDoc_STRVAR(_ssl_enum_certificates__doc__,
 "enum_certificates($module, /, store_name)\n"
@@ -3304,9 +3304,9 @@ exit:
     return return_value;
 }
 
-#endif /* defined(_MSC_VER) */
+#endif /* defined(MS_WINDOWS) */
 
-#if defined(_MSC_VER)
+#if defined(MS_WINDOWS)
 
 PyDoc_STRVAR(_ssl_enum_crls__doc__,
 "enum_crls($module, /, store_name)\n"
@@ -3385,7 +3385,7 @@ exit:
     return return_value;
 }
 
-#endif /* defined(_MSC_VER) */
+#endif /* defined(MS_WINDOWS) */
 
 #ifndef _SSL__SSLSOCKET_SENDFILE_METHODDEF
     #define _SSL__SSLSOCKET_SENDFILE_METHODDEF
@@ -3398,4 +3398,4 @@ exit:
 #ifndef _SSL_ENUM_CRLS_METHODDEF
     #define _SSL_ENUM_CRLS_METHODDEF
 #endif /* !defined(_SSL_ENUM_CRLS_METHODDEF) */
-/*[clinic end generated code: output=3a5bdd8db17e32b1 input=a9049054013a1b77]*/
+/*[clinic end generated code: output=63c6db338c726da4 input=a9049054013a1b77]*/

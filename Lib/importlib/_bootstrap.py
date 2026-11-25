@@ -1097,18 +1097,51 @@ class FrozenImporter:
         spec = module.__spec__
         name = spec.name
         code = _call_with_frames_removed(_imp.get_frozen_object, name)
+        FrozenImporter._fix_stdlib_filename(code, spec)
         exec(code, module.__dict__)
+
+    @staticmethod
+    def _fix_stdlib_filename(code, spec):
+        # A build with the whole stdlib frozen: report the module's source
+        # path, as a sourceless .pyc does, rather than "<frozen NAME>", so
+        # that tracebacks, warnings and trace find it.  The import machinery
+        # keeps its "<frozen importlib._bootstrap>" names, by which
+        # tracebacks of failed imports omit its frames.
+        if (spec is not None and getattr(_imp, '_stdlib_frozen', False) and
+                spec.name not in ('_frozen_importlib',
+                                  '_frozen_importlib_external')):
+            filename = getattr(spec.loader_state, 'filename', None)
+            if filename:
+                _imp._fix_co_filename(code, filename)
 
     @classmethod
     @_requires_frozen
     def get_code(cls, fullname):
         """Return the code object for the frozen module."""
-        return _imp.get_frozen_object(fullname)
+        code = _imp.get_frozen_object(fullname)
+        if getattr(_imp, '_stdlib_frozen', False):
+            # As exec_module() does, for runpy (-m).
+            cls._fix_stdlib_filename(code, cls.find_spec(fullname))
+        return code
 
     @classmethod
     @_requires_frozen
     def get_source(cls, fullname):
-        """Return None as frozen modules do not have source code."""
+        """Return None as frozen modules do not have source code.
+
+        A build that freezes the whole stdlib may embed its sources.
+        """
+        if getattr(_imp, '_stdlib_frozen', False):
+            import _frozen_stdlib
+            return _frozen_stdlib.get_source(fullname)
+        return None
+
+    @classmethod
+    def get_resource_reader(cls, fullname):
+        """Return the resource reader of a package of a frozen stdlib."""
+        if getattr(_imp, '_stdlib_frozen', False) and _imp.is_frozen(fullname):
+            import _frozen_stdlib
+            return _frozen_stdlib.get_resource_reader(fullname)
         return None
 
     @classmethod

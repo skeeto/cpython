@@ -137,6 +137,18 @@ _PyRuntime_Initialize(void)
     if (runtime_initialized) {
         return _PyStatus_OK();
     }
+#if defined(__MINGW32__) && defined(_Py_TARGET_XP)
+    /* Windows XP does not set up the thread-local storage of a DLL loaded
+       at run time (Platforms/w64devkit/xpcompat). */
+    extern int _Py_XPTlsReady(void);
+    if (!_Py_XPTlsReady()) {
+        return _PyStatus_ERR("Windows XP cannot run Python in a DLL loaded "
+                             "at run time; link it at load time");
+    }
+    /* XP's msvcrt.dll has an ANSI-derived wide environment. */
+    extern void _Py_XPFixEnviron(void);
+    _Py_XPFixEnviron();
+#endif
     runtime_initialized = 1;
 
     return _PyRuntimeState_Init(&_PyRuntime);

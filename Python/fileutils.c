@@ -2952,7 +2952,9 @@ _Py_GetLocaleconvNumeric(struct lconv *lc,
     assert(decimal_point != NULL);
     assert(thousands_sep != NULL);
 
-#ifndef MS_WINDOWS
+/* _Py_NO_LCONV_W: the C runtime's struct lconv has no _W_* fields
+   (msvcrt.dll before Windows 7). */
+#if !defined(MS_WINDOWS) || defined(_Py_NO_LCONV_W)
     int change_locale = 0;
     if ((strlen(lc->decimal_point) > 1 || ((unsigned char)lc->decimal_point[0]) > 127)) {
         change_locale = 1;
@@ -3012,7 +3014,7 @@ _Py_GetLocaleconvNumeric(struct lconv *lc,
     res = 0;
 
 done:
-#ifndef MS_WINDOWS
+#if !defined(MS_WINDOWS) || defined(_Py_NO_LCONV_W)
     if (loc != NULL) {
         setlocale(LC_CTYPE, oldloc);
     }

@@ -15,11 +15,27 @@
 
 #define _WIN32_DCOM
 #include <Windows.h>
-#include <comdef.h>
+#ifndef __MINGW32__
+#include <comdef.h>             // bstr_t (see below for mingw-w64)
+#endif
 #include <Wbemidl.h>
 #include <propvarutil.h>
 
 #include <Python.h>
+
+#ifdef __MINGW32__
+// mingw-w64's bstr_t needs the C++ runtime (operator new).  These BSTRs
+// only live for the duration of one call.
+struct _Py_bstr {
+    BSTR str;
+    explicit _Py_bstr(const wchar_t *s) : str(SysAllocString(s)) {}
+    ~_Py_bstr() { SysFreeString(str); }
+    _Py_bstr(const _Py_bstr &) = delete;
+    _Py_bstr &operator=(const _Py_bstr &) = delete;
+    operator BSTR() const { return str; }
+};
+#  define bstr_t _Py_bstr
+#endif
 
 
 #if _MSVC_LANG >= 202002L
@@ -117,7 +133,7 @@ _query_thread(LPVOID param)
     }
     if (SUCCEEDED(hr)) {
         hr = services->ExecQuery(
-            bstr_t("WQL"),
+            bstr_t(L"WQL"),
             bstrQuery,
             WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY,
             NULL,

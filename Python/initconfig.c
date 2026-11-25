@@ -1193,7 +1193,8 @@ _PyConfig_InitCompatConfig(PyConfig *config)
 #ifdef MS_WINDOWS
     config->legacy_windows_stdio = -1;
 #endif
-#ifdef Py_DEBUG
+#if defined(Py_DEBUG) && !(defined(Py_STDLIB_FROZEN) && Py_STDLIB_FROZEN)
+    /* A frozen stdlib is the only stdlib, even in debug builds. */
     config->use_frozen_modules = 0;
 #else
     config->use_frozen_modules = 1;

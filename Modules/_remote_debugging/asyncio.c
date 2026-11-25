@@ -21,6 +21,14 @@ _Py_RemoteDebug_GetAsyncioDebugAddress(proc_handle_t* handle)
     // On Windows, search for asyncio debug in executable or DLL
     address = search_windows_map_for_section(handle, "AsyncioD", L"_asyncio",
                                              NULL);
+#ifdef __MINGW32__
+    // _asyncio may be built into python.exe or python.dll.
+    if (address == 0 && !_Py_RemoteDebug_IsFatalReadError()) {
+        PyErr_Clear();
+        address = search_windows_map_for_section(handle, "AsyncioD",
+                                                 L"python", NULL);
+    }
+#endif
     if (address == 0) {
         if (!_Py_RemoteDebug_IsFatalReadError()) {
             PyObject *exc = PyErr_GetRaisedException();

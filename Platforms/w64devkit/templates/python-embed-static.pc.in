@@ -1,0 +1,11 @@
+# Embed Python statically (libpython.a).  The full path is used because
+# -lpython would find python.dll.a first.
+prefix=${pcfiledir}/../..
+includedir=${prefix}/include
+libdir=${prefix}/lib
+
+Name: Python
+Description: Embed Python into an application (static, @PY_PLATFORM_TAG@)
+Version: @PY_SHORT@
+Cflags: -I${includedir}/@PY_INCLUDE_SUBDIR@ -DPy_NO_ENABLE_SHARED
+Libs: ${libdir}/@PY_STATIC_LIB_NAME@ @PY_SYSTEM_LIBS_LFLAGS@

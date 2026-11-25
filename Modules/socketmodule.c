@@ -290,7 +290,9 @@ shutdown(how) -- shut down traffic in one or both directions\n\
 /* Helpers needed for AF_HYPERV */
 # include <Rpc.h>
 
-/* Macros based on the IPPROTO enum, see: https://bugs.python.org/issue29515 */
+/* Macros based on the IPPROTO enum, see: https://bugs.python.org/issue29515
+   (mingw-w64 already defines them as macros) */
+#ifdef _MSC_VER
 #define IPPROTO_ICMP IPPROTO_ICMP
 #define IPPROTO_IGMP IPPROTO_IGMP
 #define IPPROTO_GGP IPPROTO_GGP
@@ -321,6 +323,7 @@ shutdown(how) -- shut down traffic in one or both directions\n\
 #define IPPROTO_PGM IPPROTO_PGM  // WinSock2 only
 #define IPPROTO_L2TP IPPROTO_L2TP  // WinSock2 only
 #define IPPROTO_SCTP IPPROTO_SCTP  // WinSock2 only
+#endif
 
 /* Provides the IsWindows7SP1OrGreater() function */
 #include <versionhelpers.h>

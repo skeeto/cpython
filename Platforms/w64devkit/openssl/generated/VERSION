@@ -1,0 +1,6 @@
+version=3.5.9
+url=https://github.com/python/cpython-source-deps/archive/refs/tags/openssl-3.5.9.tar.gz
+sha256=d6cf0d9a651f25fe506f6b3dc133a80b9b79a0bc565f570dcf8fdbd597551485
+configure_targets=mingw64 mingw
+configure_options=no-asm no-uplink no-shared no-module no-engine no-legacy no-quic no-pinshared no-apps no-docs no-tests no-makedepend
+configure_options_sha256=7cc5a2ef8f427e45fa79cc74a284eb8bbdcf57c80d765ac3ee297ac336661def

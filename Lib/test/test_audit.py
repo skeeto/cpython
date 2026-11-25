@@ -27,8 +27,10 @@ class AuditTest(unittest.TestCase):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         ) as p:
-            p.wait()
-            return p, p.stdout.read(), p.stderr.read()
+            # communicate() rather than wait(): output larger than the pipe
+            # buffer would deadlock.
+            stdout, stderr = p.communicate()
+            return p, stdout, stderr
 
     def do_test(self, *args):
         proc, stdout, stderr = self.run_test_in_subprocess(*args)
